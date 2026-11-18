@@ -63,3 +63,41 @@ class MetricDefService:
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
         return entry, f"指标定义已{action}"
+
+    def sync_conclusion_caliber(self) -> dict[str, Any]:
+        """跨模块联动（V002）：指标定义模块读取洞察结论数据表中的指标标识，
+        为关键发现补齐口径版本。
+
+        结论表是口径版本的接收方：本方法按指标名称/指标编号匹配指标定义，
+        把已生效的口径版本回写到结论行；匹配不上的标识单独返回便于核对。
+        """
+        # 延迟导入避免模块间循环依赖。
+        from app.services.insight_report import CONCLUSION_MODULE
+
+        updated = 0
+        unmatched: list[str] = []
+        metric_rows = store.rows(MODULE)
+        for conclusion in store.rows(CONCLUSION_MODULE):
+            if conclusion.get("口径版本"):
+                continue
+            identifier = str(conclusion.get("指标标识", ""))
+            matched = next(
+                (row for row in metric_rows
+                 if identifier and (identifier in str(row.get("指标名称", ""))
+                                    or identifier == str(row.get("指标编号", "")))),
+                None,
+            )
+            if matched is None:
+                if identifier:
+                    unmatched.append(identifier)
+                continue
+            conclusion["口径版本"] = matched.get("口径版本", "")
+            updated += 1
+        if updated:
+            store.bump_version(CONCLUSION_MODULE)
+        return {
+            "ok": True,
+            "updated": updated,
+            "unmatched": sorted(set(unmatched)),
+            "message": f"指标定义V002联动：已为 {updated} 条关键发现补齐口径版本",
+        }

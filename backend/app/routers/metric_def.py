@@ -90,3 +90,9 @@ def run_action(entry_id: int, payload: ActionPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
+
+
+@router.post("/sync-conclusion-caliber")
+def sync_conclusion_caliber() -> dict[str, object]:
+    """跨模块联动（V002）：读取洞察结论数据表的指标标识，为关键发现补齐口径版本。"""
+    return service.sync_conclusion_caliber()

@@ -485,14 +485,16 @@ test('CRUD模块：筛选、导出、登记、动作、指标全链路', async (
     await page.goto(`/${mod.key}`)
     await page.waitForTimeout(3000)
     const bodyRows = page.locator('tbody tr[data-testid^="row-"]')
-    await expect(bodyRows).toHaveCount(3)
+    // 基线行数动态获取：部分模块（如指标定义 V002 联动）会携带额外种子行，不硬编码 3。
+    const baseline = await bodyRows.count()
+    expect(baseline).toBeGreaterThan(0)
     const firstValue = await bodyRows.nth(0).locator('td').nth(0).innerText()
 
     await page.getByTestId(`filter-${mod.fields[0]}`).fill(firstValue)
     await page.getByTestId('query').click()
     await expect(bodyRows).toHaveCount(1)
     await page.getByTestId('reset').click()
-    await expect(bodyRows).toHaveCount(3)
+    await expect(bodyRows).toHaveCount(baseline)
 
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('export').click()
@@ -507,7 +509,7 @@ test('CRUD模块：筛选、导出、登记、动作、指标全链路', async (
     }
     await page.getByTestId('submit-create').click()
     await expect(page.getByTestId('create-modal')).toHaveCount(0)
-    await expect(bodyRows).toHaveCount(4)
+    await expect(bodyRows).toHaveCount(baseline + 1)
 
     const createdRow = page.locator('tbody tr').filter({ hasText: createdValues[0] })
     for (const [i, action] of mod.actions.entries()) {
